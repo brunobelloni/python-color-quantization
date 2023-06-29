@@ -5,8 +5,6 @@ import matplotlib.image
 import numpy as np
 import sobol
 
-np.random.seed(42)  # for reproducibility
-
 
 def maximin(pixels, k):
     """
@@ -59,7 +57,7 @@ def sobol_sequence(index):
     a Sobol sequence. Adapted from Numerical Recipies
     in C. Upon return, X and Y fall in [0,1).
     """
-    sequence = get_sobol_sequence(dimension=3, n_points=60_000)
+    sequence = get_sobol_sequence(dimension=3, n_points=200_000)
     return sequence[index][1], sequence[index][2]
 
 
@@ -75,23 +73,18 @@ def okm(pixels, k, lr_exp=0.5, sample_rate=1.0, **kwargs):
     :param sample_rate: Fraction of the input pixels (must be in (0, 1])
     """
     cluster = kwargs.get('cluster', maximin(pixels=pixels, k=k))
-    sizes = np.full(shape=k, fill_value=0)
+    sizes = kwargs.get('sizes', np.full(shape=k, fill_value=0))
 
     image_height = kwargs.get('image').shape[0]
     image_width = kwargs.get('image').shape[1]
 
     num_samples = int(sample_rate * pixels.shape[0] + 0.5)
 
-    for i in range(num_samples):
-        sob_x, sob_y = sobol_sequence(index=i)
-
-        row_idx = int(sob_y * image_height + 0.5)
-        if row_idx == image_height:
-            row_idx -= 1
-        col_idx = int(sob_x * image_width + 0.5)
-        if col_idx == image_width:
-            col_idx -= 1
-
+    sobel_index = 0
+    for sobel_index in range(num_samples):
+        sob_x, sob_y = sobol_sequence(index=sobel_index + kwargs.get('sobel_index', 0))
+        row_idx = min(int(sob_y * image_height + 0.5), image_height - 1)
+        col_idx = min(int(sob_x * image_width + 0.5), image_width - 1)
         rand_pixel = pixels[row_idx * image_width + col_idx]
 
         min_dist = np.inf
@@ -115,7 +108,7 @@ def okm(pixels, k, lr_exp=0.5, sample_rate=1.0, **kwargs):
 
     # Assign each pixel to the nearest cluster centroid
     labels = np.argmin(np.linalg.norm(pixels[:, None] - cluster, axis=-1), axis=-1)
-    return cluster, labels
+    return cluster, labels, sizes, sobel_index + kwargs.get('sobel_index', 0) + 1
 
 
 def iokm(pixels, k, lr_exp=0.5, sample_rate=0.5, **kwargs):
@@ -132,39 +125,42 @@ def iokm(pixels, k, lr_exp=0.5, sample_rate=0.5, **kwargs):
     :param sample_rate: Fraction of the input pixels (must be in (0, 1])
     """
     num_splits = int(math.log2(k) / math.log2(2) + 0.5)
+    cluster = np.full(shape=(2 * k - 1, pixels.shape[1]), fill_value=0, dtype=np.float64)
+    cluster[0] = np.mean(pixels, axis=0)
+    sizes = np.full(shape=2 * k - 1, fill_value=0)
 
-    cluster = np.full(shape=(k, pixels.shape[1]), fill_value=0, dtype=np.float64)
-    temp_cluster = np.full(shape=(2 * k - 1, pixels.shape[1]), fill_value=0, dtype=np.float64)
-    temp_cluster[0] = np.mean(pixels, axis=0)
-
+    sobel_index = 0
     for t in range(num_splits):
         for n in range(pow(2, t) - 1, pow(2, t + 1) - 1):
-            pixel = temp_cluster[n]
+            pixel = cluster[n] # Split c_n into c_{2n + 1} and c_{2n + 2}
 
+            # Left child
             index = 2 * n + 1
-            temp_cluster[index] = pixel
+            cluster[index] = pixel
 
+            # Right child
             index += 1
-            temp_cluster[index] = pixel
+            cluster[index] = pixel
 
         # Refine the new centers using online k-means
-        temp_cluster[pow(2, t + 1) - 1:], _ = okm(
+        okm_index = pow(2, t + 1) - 1
+        cluster[okm_index:], _, sizes[okm_index:], sobel_index = okm(
             pixels=pixels,
-            k=pow(2, t + 1),
             lr_exp=lr_exp,
+            k=pow(2, t + 1),
             sample_rate=sample_rate,
-            cluster=temp_cluster[pow(2, t + 1) - 1:],
+            sobel_index=sobel_index,
+            sizes=sizes[okm_index:],
+            cluster=cluster[okm_index:],
             **kwargs,
         )
 
-    # last k centers are the final centers
-    for j in range(k):
-        cluster[j] = temp_cluster[j + k - 1]
+    cluster = cluster[-k:]  # last k centers are the final centers
 
     # Assign each pixel to the nearest cluster centroid
     labels = np.argmin(np.linalg.norm(pixels[:, None] - cluster, axis=-1), axis=-1)
 
-    return cluster, labels
+    return cluster, labels, None, None
 
 
 def mse(pixels, cluster, k):
@@ -188,11 +184,11 @@ def main():
 
     for algorithm in ['okm', 'iokm']:
         kwargs = {
+            'k': k,
             'image': image,
             'pixels': pixels,
-            'k': k,
         }
-        cluster, labels = globals()[algorithm](**kwargs)
+        cluster, labels, _, _ = globals()[algorithm](**kwargs)
 
         # compute the MSE of quantized image
         error = mse(pixels=pixels, cluster=cluster, k=k)
