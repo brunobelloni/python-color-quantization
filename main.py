@@ -1,7 +1,9 @@
 import math
+from functools import lru_cache
 
 import matplotlib.image
 import numpy as np
+import sobol
 
 np.random.seed(42)  # for reproducibility
 
@@ -46,7 +48,22 @@ def maximin(pixels, k):
     return np.array(centroids)
 
 
-def okm(pixels, k, lr_exp=0.5, sample_rate=1.0, cluster: np.array = None):
+@lru_cache
+def get_sobol_sequence(dimension, n_points):
+    return sobol.sample(dimension=dimension, n_points=n_points)
+
+
+def sobol_sequence(index):
+    """
+    Function to generate two quasi-random numbers from
+    a Sobol sequence. Adapted from Numerical Recipies
+    in C. Upon return, X and Y fall in [0,1).
+    """
+    sequence = get_sobol_sequence(dimension=3, n_points=60_000)
+    return sequence[index][1], sequence[index][2]
+
+
+def okm(pixels, k, lr_exp=0.5, sample_rate=1.0, **kwargs):
     """
     Online K-Means Algorithm:
     S. Thompson, M. E. Celebi, and K. H. Buck,
@@ -57,14 +74,25 @@ def okm(pixels, k, lr_exp=0.5, sample_rate=1.0, cluster: np.array = None):
     :param lr_exp: Learning rate exponent (must be in [0.5, 1])
     :param sample_rate: Fraction of the input pixels (must be in (0, 1])
     """
-    if cluster is None:
-        cluster = maximin(pixels=pixels, k=k)
+    cluster = kwargs.get('cluster', maximin(pixels=pixels, k=k))
     sizes = np.full(shape=k, fill_value=0)
+
+    image_height = kwargs.get('image').shape[0]
+    image_width = kwargs.get('image').shape[1]
 
     num_samples = int(sample_rate * pixels.shape[0] + 0.5)
 
-    for _ in range(num_samples):
-        rand_pixel = pixels[np.random.choice(pixels.shape[0])]
+    for i in range(num_samples):
+        sob_x, sob_y = sobol_sequence(index=i)
+
+        row_idx = int(sob_y * image_height + 0.5)
+        if row_idx == image_height:
+            row_idx -= 1
+        col_idx = int(sob_x * image_width + 0.5)
+        if col_idx == image_width:
+            col_idx -= 1
+
+        rand_pixel = pixels[row_idx * image_width + col_idx]
 
         min_dist = np.inf
         min_dist_index = -np.inf
@@ -90,7 +118,7 @@ def okm(pixels, k, lr_exp=0.5, sample_rate=1.0, cluster: np.array = None):
     return cluster, labels
 
 
-def iokm(pixels, k, lr_exp=0.5, sample_rate=0.5):
+def iokm(pixels, k, lr_exp=0.5, sample_rate=0.5, **kwargs):
     """
     Incremental Online K-Means Algorithm:
 
@@ -126,6 +154,7 @@ def iokm(pixels, k, lr_exp=0.5, sample_rate=0.5):
             lr_exp=lr_exp,
             sample_rate=sample_rate,
             cluster=temp_cluster[pow(2, t + 1) - 1:],
+            **kwargs,
         )
 
     # last k centers are the final centers
@@ -153,12 +182,17 @@ def mse(pixels, cluster, k):
 def main():
     image = matplotlib.image.imread('fish.ppm')  # Load the image
 
-    k = 32  # Number of colors to quantize to
+    k = 8  # Number of colors to quantize to
     pixels = image.reshape(-1, 3)  # Reshape the image to be a list of RGB colors.
     pixels = pixels.astype(np.float64)
 
     for algorithm in ['okm', 'iokm']:
-        cluster, labels = globals()[algorithm](pixels=pixels, k=k)
+        kwargs = {
+            'image': image,
+            'pixels': pixels,
+            'k': k,
+        }
+        cluster, labels = globals()[algorithm](**kwargs)
 
         # compute the MSE of quantized image
         error = mse(pixels=pixels, cluster=cluster, k=k)
