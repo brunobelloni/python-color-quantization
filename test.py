@@ -30,7 +30,7 @@ expected_maximin_centroids = np.array([
 def test_maximin(test_data):
     _, pixels, k = test_data
     start = time.time()
-    centroids = maximin(pixels=pixels, k=k)
+    centroids = maximin(x=pixels, k=k)
     end = time.time()
     print(f"maximin took {end - start} seconds")
     assert np.allclose(centroids, expected_maximin_centroids)
@@ -51,7 +51,7 @@ expected_bkm_centroids = np.array([
 def test_bkm(test_data):
     image, pixels, k = test_data
     start = time.time()
-    centroids, _, _ = bkm(pixels=pixels, k=k, image=image)
+    centroids, _, _ = bkm(x=pixels, k=k, image=image)
     end = time.time()
     print(f"bkm took {end - start} seconds")
     assert np.allclose(centroids, expected_bkm_centroids)
@@ -72,7 +72,7 @@ expected_ibkm_centroids = np.array([
 def test_ibkm(test_data):
     image, pixels, k = test_data
     start = time.time()
-    centroids, _, _ = ibkm(pixels=pixels, k=k, image=image)
+    centroids, _, _ = ibkm(x=pixels, k=k, image=image)
     end = time.time()
     print(f"ibkm took {end - start} seconds")
     assert np.allclose(centroids, expected_ibkm_centroids)
@@ -93,7 +93,7 @@ expected_okm_centroids = np.array([
 def test_okm(test_data):
     image, pixels, k = test_data
     start = time.time()
-    centroids, _, _ = okm(pixels=pixels, k=k, image=image)
+    centroids, _, _ = okm(x=pixels, k=k, image=image)
     end = time.time()
     print(f"okm took {end - start} seconds")
     assert np.allclose(centroids, expected_okm_centroids)
@@ -114,7 +114,7 @@ expected_iokm_centroids = np.array([
 def test_iokm(test_data):
     image, pixels, k = test_data
     start = time.time()
-    centroids, _, _ = iokm(pixels=pixels, k=k, image=image)
+    centroids, _, _ = iokm(x=pixels, k=k, image=image)
     end = time.time()
     print(f"iokm took {end - start} seconds")
     assert np.allclose(centroids, expected_iokm_centroids)
