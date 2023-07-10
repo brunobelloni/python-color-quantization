@@ -53,6 +53,21 @@ def sobol_sequence(index):
     return sequence[index][1], sequence[index][2]
 
 
+def find_nearest_cluster(point, cluster):
+    min_dist = np.inf
+    min_dist_index = -np.inf
+
+    for j in range(len(cluster)):
+        delta = cluster[j] - point
+        distance = np.dot(delta, delta)  # Calculate Euclidean distance
+
+        if distance < min_dist:
+            min_dist = distance
+            min_dist_index = j
+
+    return min_dist_index
+
+
 def bkm(x, k, **kwargs):
     """
     Batch K-Means Algorithm:
@@ -81,17 +96,7 @@ def bkm(x, k, **kwargs):
         sizes[:] = 0
 
         for i, point in enumerate(x):
-            # Find the nearest center
-            min_dist = np.inf
-            min_dist_index = -np.inf
-            for j in range(k):
-                del_red = point[0] - cluster[j][0]
-                del_green = point[1] - cluster[j][1]
-                del_blue = point[2] - cluster[j][2]
-                distance = (del_red * del_red) + (del_green * del_green) + (del_blue * del_blue)
-                if distance < min_dist:
-                    min_dist = distance
-                    min_dist_index = j
+            min_dist_index = find_nearest_cluster(point=point, cluster=cluster)
 
             if (num_iters == 1) or (member[i] != min_dist_index):
                 # Update the membership of the point
@@ -133,24 +138,18 @@ def ibkm(x, k, **kwargs):
 
     for t in range(num_splits):
         for n in range(pow(2, t) - 1, pow(2, t + 1) - 1):
-            # Split c_n into c_{2n+1} and c_{2n+2}
-            point = cluster[n]
-
-            # Left child
-            index = 2 * n + 1
-            cluster[index] = point
-
-            # Right child
-            index += 1
-            cluster[index] = point + epsilon
+            point = cluster[n]  # Split c[n] into c[2n + 1] and c[2n + 2]
+            cluster[2 * n + 1] = point  # Left child
+            cluster[2 * n + 2] = point + epsilon  # Right child
 
         # Refine the new centers using batch k-means
-        bkm_index = pow(2, t + 1) - 1
-        cluster[bkm_index:], sizes[bkm_index:], _ = bkm(
+        bkm_index_start = pow(2, t + 1) - 1
+        bkm_index_end = pow(2, t + 2) - 1
+        cluster[bkm_index_start:bkm_index_end], sizes[bkm_index_start:bkm_index_end], _ = bkm(
             x=x,
             k=pow(2, t + 1),
-            sizes=sizes[bkm_index:],
-            cluster=cluster[bkm_index:],
+            sizes=sizes[bkm_index_start:bkm_index_end],
+            cluster=cluster[bkm_index_start:bkm_index_end],
         )
 
     cluster = cluster[-k:]  # last k centers are the final centers
@@ -187,16 +186,7 @@ def okm(x, k, lr_exp=0.5, sample_rate=1.0, **kwargs):
         col_idx = min(int(sob_x * image_width + 0.5), image_width - 1)
         rand_x = x[row_idx * image_width + col_idx]
 
-        min_dist = np.inf
-        min_dist_index = -np.inf
-        for j in range(k):
-            del_red = cluster[j][0] - rand_x[0]
-            del_green = cluster[j][1] - rand_x[1]
-            del_blue = cluster[j][2] - rand_x[2]
-            distance = (del_red * del_red) + (del_green * del_green) + (del_blue * del_blue)
-            if distance < min_dist:
-                min_dist = distance
-                min_dist_index = j
+        min_dist_index = find_nearest_cluster(point=rand_x, cluster=cluster)
 
         sizes[min_dist_index] += 1
         learn_rate = pow(sizes[min_dist_index], -lr_exp)
@@ -207,7 +197,7 @@ def okm(x, k, lr_exp=0.5, sample_rate=1.0, **kwargs):
     return cluster, sizes, sobel_index + kwargs.get('sobel_index', 0) + 1
 
 
-def iokm(x, k, lr_exp=1.0, sample_rate=0.5, **kwargs):
+def iokm(x, k, lr_exp=0.5, sample_rate=0.5, **kwargs):
     """
     Incremental Online K-Means Algorithm:
 
@@ -230,26 +220,21 @@ def iokm(x, k, lr_exp=1.0, sample_rate=0.5, **kwargs):
     sobel_index = 0
     for t in range(num_splits):
         for n in range(pow(2, t) - 1, pow(2, t + 1) - 1):
-            point = cluster[n]  # Split c_n into c_{2n + 1} and c_{2n + 2}
-
-            # Left child
-            index = 2 * n + 1
-            cluster[index] = point
-
-            # Right child
-            index += 1
-            cluster[index] = point
+            point = cluster[n]  # Split c[n] into c[2n + 1] and c[2n + 2]
+            cluster[2 * n + 1] = point  # Left child
+            cluster[2 * n + 2] = point  # Right child
 
         # Refine the new centers using online k-means
-        okm_index = pow(2, t + 1) - 1
-        cluster[okm_index:], sizes[okm_index:], sobel_index = okm(
+        okm_index_start = pow(2, t + 1) - 1
+        okm_index_end = pow(2, t + 2) - 1
+        cluster[okm_index_start:okm_index_end], sizes[okm_index_start:okm_index_end], sobel_index = okm(
             x=x,
             lr_exp=lr_exp,
             k=pow(2, t + 1),
             sample_rate=sample_rate,
             sobel_index=sobel_index,
-            sizes=sizes[okm_index:],
-            cluster=cluster[okm_index:],
+            sizes=sizes[okm_index_start:okm_index_end],
+            cluster=cluster[okm_index_start:okm_index_end],
             **kwargs,
         )
 
@@ -275,8 +260,7 @@ def main():
     pixels = image.reshape(-1, 3)  # Reshape the image to be a list of RGB colors.
     pixels = pixels.astype(np.float64)
 
-    for algorithm in [ 'iokm']:
-    # for algorithm in ['bkm', 'ibkm', 'okm', 'iokm']:
+    for algorithm in ['bkm', 'ibkm', 'okm', 'iokm']:
         kwargs = {'k': k, 'image': image, 'x': pixels}
         cluster, _, _ = globals()[algorithm](**kwargs)
 
