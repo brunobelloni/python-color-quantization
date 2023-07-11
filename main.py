@@ -187,9 +187,9 @@ def okm(x, k, lr_exp=0.5, sample_rate=1.0, **kwargs):
 
     num_samples = int(sample_rate * x.shape[0] + 0.5)
 
-    sobel_index = 0
-    for sobel_index in range(num_samples):
-        sob_x, sob_y = sobol_sequence(index=sobel_index + kwargs.get('sobel_index', 0))
+    sobol_index = 0
+    for sobol_index in range(num_samples):
+        sob_x, sob_y = sobol_sequence(index=sobol_index + kwargs.get('sobol_index', 0))
         row_idx = min(int(sob_y * image_height + 0.5), image_height - 1)
         col_idx = min(int(sob_x * image_width + 0.5), image_width - 1)
         rand_x = x[row_idx * image_width + col_idx]
@@ -202,7 +202,7 @@ def okm(x, k, lr_exp=0.5, sample_rate=1.0, **kwargs):
         # Update the cluster with the learning rate and difference
         cluster[min_dist_index] += learn_rate * (rand_x - cluster[min_dist_index])
 
-    return cluster, sizes, sobel_index + kwargs.get('sobel_index', 0) + 1
+    return cluster, sizes, sobol_index + kwargs.get('sobol_index', 0) + 1
 
 
 def iokm(x, k, lr_exp=0.5, sample_rate=0.5, **kwargs):
@@ -225,7 +225,7 @@ def iokm(x, k, lr_exp=0.5, sample_rate=0.5, **kwargs):
     cluster[0] = np.mean(x, axis=0)
     sizes = np.zeros(shape=2 * k - 1)
 
-    sobel_index = 0
+    sobol_index = 0
     for t in range(num_splits):
         split_start, split_end = pow(2, t) - 1, pow(2, t + 1) - 1
         okm_start, okm_end = pow(2, t + 1) - 1, pow(2, t + 2) - 1
@@ -240,11 +240,11 @@ def iokm(x, k, lr_exp=0.5, sample_rate=0.5, **kwargs):
             cluster[2 * n + 2] = point  # Right child
 
         # Refine the new centers using online k-means
-        cluster[okm_start:okm_end], sizes[okm_start:okm_end], sobel_index = okm(
+        cluster[okm_start:okm_end], sizes[okm_start:okm_end], sobol_index = okm(
             x=x,
             lr_exp=lr_exp,
             sample_rate=sample_rate,
-            sobel_index=sobel_index,
+            sobol_index=sobol_index,
             sizes=sizes[okm_start:okm_end],
             k=len(cluster[okm_start:okm_end]),
             cluster=cluster[okm_start:okm_end],
