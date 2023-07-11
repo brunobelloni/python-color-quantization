@@ -35,7 +35,6 @@ def main():
         kwargs = {
             'x': train_images,
             'k': 10,  # MNIST dataset has 10 classes
-            'image': np.zeros((28, 28, 3)),  # okm/iokm
         }
         if algorithm == 'iokm':
             kwargs['lr_exp'] = 0.1

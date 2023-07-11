@@ -1,5 +1,4 @@
-import numpy as np
-from sklearn.datasets import load_breast_cancer
+from sklearn.datasets import load_iris
 from sklearn.metrics import accuracy_score, recall_score, f1_score
 from sklearn.model_selection import train_test_split
 
@@ -8,13 +7,13 @@ from playground.mnist import assign_labels
 
 
 def main():
-    # Load the Breast Cancer Wisconsin Diagnostic dataset
-    cancer_dataset = load_breast_cancer()
+    # Load the Iris dataset
+    iris_dataset = load_iris()
 
     # Split the data
     x_train, x_test, y_train, y_test = train_test_split(
-        cancer_dataset.data,
-        cancer_dataset.target,
+        iris_dataset.data,
+        iris_dataset.target,
         test_size=0.2,
         random_state=42,
     )
@@ -25,11 +24,11 @@ def main():
     for algorithm in ['bkm', 'ibkm', 'okm', 'iokm']:
         kwargs = {
             'x': x_train,
-            'k': 2,  # Breast cancer dataset has 2 classes
+            'k': 3,  # Iris dataset has 3 classes
         }
-        if algorithm == 'iokm':
-            kwargs['lr_exp'] = 0.1
-            kwargs['sample_rate'] = 1.0
+        # if algorithm == 'iokm':
+        #     kwargs['lr_exp'] = 0.1
+        #     kwargs['sample_rate'] = 1.0
         cluster, _, _ = getattr(functions, algorithm)(**kwargs)
 
         # Assign each instance to the nearest cluster centroid

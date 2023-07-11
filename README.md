@@ -7,6 +7,13 @@
 
 ---
 
+#### Color Quantization Visualization:
+
+| Original Image (24-bit)           | K=8 (3-bit)                     | K=16 (4-bit)                     | K=32 (5-bit)                     |
+|-----------------------------------|---------------------------------|----------------------------------|----------------------------------|
+| ![24-bit](out/original_image.png) | ![3-bit](out/iokm_8K_image.png) | ![4-bit](out/iokm_16K_image.png) | ![5-bit](out/iokm_32K_image.png) |
+
+
 #### Cluster Visualization:
 
 ![3d_clusters_okm.gif](3d_clusters_okm.gif)
