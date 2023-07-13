@@ -1,7 +1,7 @@
 import numpy as np
 from sklearn.metrics import accuracy_score, recall_score, f1_score
 from torchvision import datasets
-from sklearn.cluster import KMeans, MiniBatchKMeans
+from sklearn.cluster import MiniBatchKMeans
 
 
 def main():

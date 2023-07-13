@@ -1,9 +1,31 @@
 import math
-from functools import lru_cache
 
 import matplotlib.image
 import numpy as np
-import sobol
+from scipy.stats import qmc
+
+
+class SequenceIterator:
+    def __init__(self):
+        engine = qmc.Sobol(d=1, scramble=False)
+        self.sequence = engine.random_base2(m=23)  # 2^m points (m=23 is 8,388,608 points)
+        self.index = 0
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        if self.index >= len(self.sequence):
+            raise StopIteration
+        value = self.sequence[self.index]
+        self.index += 1
+        return value[0]
+
+    def reset(self):
+        self.index = 0
+
+
+sequence = SequenceIterator()
 
 
 def maximin(x, k):
@@ -36,21 +58,6 @@ def maximin(x, k):
         centroids.append(x[max_dist_index])
 
     return np.array(centroids)
-
-
-@lru_cache
-def get_sobol_sequence(dimension, n_points):
-    return sobol.sample(dimension=dimension, n_points=n_points)
-
-
-def sobol_sequence(index):
-    """
-    Function to generate two quasi-random numbers from
-    a Sobol sequence. Adapted from Numerical Recipies
-    in C. Upon return, X and Y fall in [0,1).
-    """
-    sequence = get_sobol_sequence(dimension=3, n_points=2_000_000)
-    return sequence[index][1], sequence[index][2]
 
 
 def is_power_of_two(number):
@@ -119,7 +126,7 @@ def bkm(x, k, **kwargs):
         if num_changes <= 0 or num_iters >= max_iters:
             break
 
-    return cluster, sizes, None
+    return cluster, sizes
 
 
 def ibkm(x, k, epsilon=0.255, **kwargs):
@@ -152,7 +159,7 @@ def ibkm(x, k, epsilon=0.255, **kwargs):
             cluster[2 * n + 2] = point + epsilon  # Right child
 
         # Refine the new centers using batch k-means
-        cluster[bkm_start:bkm_end], sizes[bkm_start:bkm_end], _ = bkm(
+        cluster[bkm_start:bkm_end], sizes[bkm_start:bkm_end] = bkm(
             x=x,
             sizes=sizes[bkm_start:bkm_end],
             k=len(cluster[bkm_start:bkm_end]),
@@ -161,7 +168,7 @@ def ibkm(x, k, epsilon=0.255, **kwargs):
 
     cluster = cluster[-k:]  # last k centers are the final centers
 
-    return cluster, None, None
+    return cluster, None
 
 
 def okm(x, k, lr_exp=0.5, sample_rate=1.0, **kwargs):
@@ -181,28 +188,18 @@ def okm(x, k, lr_exp=0.5, sample_rate=1.0, **kwargs):
     cluster = kwargs.get('cluster', maximin(x=x, k=k))
     sizes = kwargs.get('sizes', np.zeros(shape=k))
 
-    image = kwargs.get('image', np.zeros((int(math.sqrt(x.shape[0])), int(math.sqrt(x.shape[0])))))
-    image_height = image.shape[0]
-    image_width = image.shape[1]
-
     num_samples = int(sample_rate * x.shape[0] + 0.5)
-
-    sobol_index = 0
-    for sobol_index in range(num_samples):
-        sob_x, sob_y = sobol_sequence(index=sobol_index + kwargs.get('sobol_index', 0))
-        row_idx = min(int(sob_y * image_height + 0.5), image_height - 1)
-        col_idx = min(int(sob_x * image_width + 0.5), image_width - 1)
-        rand_x = x[row_idx * image_width + col_idx]
-
+    for _ in range(num_samples):
+        sob_x = next(sequence)
+        rand_x = x[int(sob_x * len(x))]
         min_dist_index = find_nearest_cluster(point=rand_x, cluster=cluster)
-
         sizes[min_dist_index] += 1
         learn_rate = pow(sizes[min_dist_index], -lr_exp)
 
         # Update the cluster with the learning rate and difference
         cluster[min_dist_index] += learn_rate * (rand_x - cluster[min_dist_index])
 
-    return cluster, sizes, sobol_index + kwargs.get('sobol_index', 0) + 1
+    return cluster, sizes
 
 
 def iokm(x, k, lr_exp=0.5, sample_rate=0.5, **kwargs):
@@ -225,7 +222,6 @@ def iokm(x, k, lr_exp=0.5, sample_rate=0.5, **kwargs):
     cluster[0] = np.mean(x, axis=0)
     sizes = np.zeros(shape=2 * k - 1)
 
-    sobol_index = 0
     for t in range(num_splits):
         split_start, split_end = pow(2, t) - 1, pow(2, t + 1) - 1
         okm_start, okm_end = pow(2, t + 1) - 1, pow(2, t + 2) - 1
@@ -240,11 +236,10 @@ def iokm(x, k, lr_exp=0.5, sample_rate=0.5, **kwargs):
             cluster[2 * n + 2] = point  # Right child
 
         # Refine the new centers using online k-means
-        cluster[okm_start:okm_end], sizes[okm_start:okm_end], sobol_index = okm(
+        cluster[okm_start:okm_end], sizes[okm_start:okm_end] = okm(
             x=x,
             lr_exp=lr_exp,
             sample_rate=sample_rate,
-            sobol_index=sobol_index,
             sizes=sizes[okm_start:okm_end],
             k=len(cluster[okm_start:okm_end]),
             cluster=cluster[okm_start:okm_end],
@@ -253,7 +248,7 @@ def iokm(x, k, lr_exp=0.5, sample_rate=0.5, **kwargs):
 
     cluster = cluster[-k:]  # last k centers are the final centers
 
-    return cluster, None, None
+    return cluster, None
 
 
 def mse(x, cluster, k):
@@ -267,16 +262,17 @@ def mse(x, cluster, k):
 
 
 def main():
-    image = matplotlib.image.imread('fish.ppm')  # Load the image
+    filename = 'fish'
+    image = matplotlib.image.imread(f"{filename}.ppm")  # Load the image
+    matplotlib.image.imsave(f"out/{filename}_original.png", image)
 
     k = 7  # Number of colors to quantize to
     pixels = image.reshape(-1, 3)  # Reshape the image to be a list of RGB colors.
     pixels = pixels.astype(np.float64)
 
-    for algorithm in ['iokm']:
-    # for algorithm in ['bkm', 'ibkm', 'okm', 'iokm']:
-        kwargs = {'k': k, 'image': image, 'x': pixels}
-        cluster, _, _ = globals()[algorithm](**kwargs)
+    for algorithm in ['bkm', 'ibkm', 'okm', 'iokm']:
+        sequence.reset()
+        cluster, _ = globals()[algorithm](x=pixels, k=k)
 
         # Assign each pixel to the nearest cluster centroid
         labels = np.argmin(np.linalg.norm(pixels[:, None] - cluster, axis=-1), axis=-1)
@@ -292,7 +288,7 @@ def main():
         quantized_image = quantized_image.astype(np.uint8)
         quantized_image = quantized_image.reshape(image.shape)
 
-        matplotlib.image.imsave(f'out/{algorithm}_{k}K_image.png', quantized_image)
+        matplotlib.image.imsave(f'out/{filename}_{algorithm}_{k}K_image.png', quantized_image)
 
 
 if __name__ == '__main__':

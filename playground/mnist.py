@@ -3,13 +3,11 @@ from sklearn.metrics import accuracy_score, recall_score, f1_score
 from torchvision import datasets
 
 import main as functions
+from main import sequence
 
 
-def assign_labels(dataset, centroids):
-    distances = np.empty((dataset.shape[0], centroids.shape[0]))
-    for i, centroid in enumerate(centroids):
-        distances[:, i] = np.linalg.norm(dataset - centroid, axis=-1)
-    return np.argmin(distances, axis=-1)
+def assign_labels(x, cluster):
+    return np.argmin(np.linalg.norm(x[:, None] - cluster, axis=-1), axis=-1)
 
 
 def main():
@@ -32,6 +30,7 @@ def main():
     test_images = test_images.astype(np.float64) / 255.0
 
     for algorithm in ['bkm', 'ibkm', 'okm', 'iokm']:
+        sequence.reset()
         kwargs = {
             'x': train_images,
             'k': 10,  # MNIST dataset has 10 classes
@@ -39,7 +38,7 @@ def main():
         if algorithm == 'iokm':
             kwargs['lr_exp'] = 0.1
             kwargs['sample_rate'] = 1.0
-        cluster, _, _ = getattr(functions, algorithm)(**kwargs)
+        cluster, _ = getattr(functions, algorithm)(**kwargs)
 
         # Assign each pixel to the nearest cluster centroid
         pred_train_labels = assign_labels(train_images, cluster)

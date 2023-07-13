@@ -51,7 +51,7 @@ expected_bkm_centroids = np.array([
 def test_bkm(test_data):
     image, pixels, k = test_data
     start = time.time()
-    centroids, _, _ = bkm(x=pixels, k=k, image=image)
+    centroids, _ = bkm(x=pixels, k=k, image=image)
     end = time.time()
     print(f"bkm took {end - start} seconds")
     assert np.allclose(centroids, expected_bkm_centroids)
@@ -72,49 +72,49 @@ expected_ibkm_centroids = np.array([
 def test_ibkm(test_data):
     image, pixels, k = test_data
     start = time.time()
-    centroids, _, _ = ibkm(x=pixels, k=k, image=image)
+    centroids, _ = ibkm(x=pixels, k=k, image=image)
     end = time.time()
     print(f"ibkm took {end - start} seconds")
     assert np.allclose(centroids, expected_ibkm_centroids)
 
 
 expected_okm_centroids = np.array([
-    [77.79575141, 38.75060744, 84.88395499],
-    [223.61492797, 209.97182455, 203.93884006],
-    [141.83313473, 111.68958113, 111.86575699],
-    [23.990431, 22.1595759, 23.00231426],
-    [56.07926268, 38.00606496, 46.84634357],
-    [168.63963331, 153.97110142, 149.06101547],
-    [100.11549186, 78.26882546, 68.17848677],
-    [115.62866898, 57.56336025, 114.37223609],
+    [77.74637033, 39.28060205, 84.33717076],
+    [226.50314107, 213.44474807, 206.69082079],
+    [142.10996277, 114.43215636, 115.43885513],
+    [25.02656539, 23.18651181, 23.71655805],
+    [99.76898795, 77.64559736, 68.35826365],
+    [167.75841188, 155.71355499, 150.73420829],
+    [115.35460949, 58.45529955, 112.64026363],
+    [56.38523941, 38.12788488, 45.57434503],
 ])
 
 
 def test_okm(test_data):
     image, pixels, k = test_data
     start = time.time()
-    centroids, _, _ = okm(x=pixels, k=k, image=image)
+    centroids, _ = okm(x=pixels, k=k, image=image)
     end = time.time()
     print(f"okm took {end - start} seconds")
     assert np.allclose(centroids, expected_okm_centroids)
 
 
 expected_iokm_centroids = np.array([
-    [225.27615183, 212.46241702, 207.30913485],
-    [141.67805674, 113.13264214, 114.69950929],
-    [102.69846672, 79.90448436, 66.74217395],
-    [169.15305493, 153.58308369, 150.51332023],
-    [22.11004311, 21.31228701, 21.73024129],
-    [77.45016404, 39.21223411, 83.11241404],
-    [53.31490344, 36.44048851, 44.88693621],
-    [114.27203737, 56.66921303, 113.14759349],
+    [114.93314634, 57.14793879, 112.93016151],
+    [52.16297328, 35.45762003, 45.11185502],
+    [22.86995512, 21.9065144, 22.10624803],
+    [77.54122084, 39.47154599, 84.26477269],
+    [101.07824149, 79.29842017, 68.1426873],
+    [142.72568028, 112.50033983, 112.70591883],
+    [230.09942453, 216.34020199, 212.95416125],
+    [171.68705579, 157.69065765, 152.32808518],
 ])
 
 
 def test_iokm(test_data):
     image, pixels, k = test_data
     start = time.time()
-    centroids, _, _ = iokm(x=pixels, k=k, image=image)
+    centroids, _ = iokm(x=pixels, k=k, image=image)
     end = time.time()
     print(f"iokm took {end - start} seconds")
     assert np.allclose(centroids, expected_iokm_centroids)

@@ -3,6 +3,7 @@ from sklearn.metrics import accuracy_score, recall_score, f1_score
 from sklearn.model_selection import train_test_split
 
 import main as functions
+from main import sequence
 from playground.mnist import assign_labels
 
 
@@ -22,14 +23,18 @@ def main():
     print(f"Test data shape: {x_test.shape}")
 
     for algorithm in ['bkm', 'ibkm', 'okm', 'iokm']:
+        sequence.reset()
         kwargs = {
             'x': x_train,
             'k': 3,  # Iris dataset has 3 classes
         }
-        # if algorithm == 'iokm':
-        #     kwargs['lr_exp'] = 0.1
-        #     kwargs['sample_rate'] = 1.0
-        cluster, _, _ = getattr(functions, algorithm)(**kwargs)
+        if algorithm == 'iokm':
+            kwargs['lr_exp'] = 0.1
+            kwargs['sample_rate'] = 0.33
+        elif algorithm == 'okm':
+            kwargs['lr_exp'] = 0.1
+            kwargs['sample_rate'] = 1.0
+        cluster, _ = getattr(functions, algorithm)(**kwargs)
 
         # Assign each instance to the nearest cluster centroid
         pred_train_labels = assign_labels(x_train, cluster)
